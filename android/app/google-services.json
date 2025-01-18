@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "303198429067",
+    "firebase_url": "https://kmalnshrah-781c9-default-rtdb.firebaseio.com",
+    "project_id": "kmalnshrah-781c9",
+    "storage_bucket": "kmalnshrah-781c9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:303198429067:android:f59ea498554e5b285a998e",
+        "android_client_info": {
+          "package_name": "kmalnshrah.murada.sa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "303198429067-c06td30g2sccg52ei5k9ot93uibcj60p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "kmalnshrah.murada.sa",
+            "certificate_hash": "5aca26aca508fc8868ebe4b8e3f2ad5936c68373"
+          }
+        },
+        {
+          "client_id": "303198429067-njhmfha7mg4m3c9khkravk40la9c420f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNUB0-pR7XD-2K4cjnmRxd2dwKYFI7fGw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "303198429067-njhmfha7mg4m3c9khkravk40la9c420f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
