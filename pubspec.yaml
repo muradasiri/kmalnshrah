@@ -1,11 +1,11 @@
 name: kmalnshrah
-description: "كم النشرة - تطبيق حاسبة بلوت"
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: "A new Flutter project."
+publish_to: 'none' # لمنع النشر إلى pub.dev
 
-version: 2.1.4+1
+version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.4 <4.0.0'
+  sdk: ^3.6.1
 
 dependencies:
   flutter:
@@ -13,24 +13,22 @@ dependencies:
   flutter_tts: ^3.3.3
   cupertino_icons: ^1.0.6
   shared_preferences: ^2.0.6
-  flutter_local_notifications: ^18.0.1
+  flutter_local_notifications: ^14.0.0
   flutter_launcher_icons: ^0.9.2
   flutter_lints: ^3.0.0
-  wakelock_plus: ^1.0.0  # أو أحدث إصدار
+  wakelock_plus: ^1.2.10
   flutter_highlight: 0.7.0
   share: ^2.0.4
   url_launcher: ^6.0.3
   permission_handler: ^10.2.0
   vibration: ^1.7.7
-  flutter_colorpicker: ^0.5.0
+  flutter_colorpicker: ^1.1.0
   flutter_web_browser: ^0.17.1
   in_app_update: ^4.0.1
   provider: ^6.0.0
-  firebase_core: ^2.32.0
-  cloud_firestore: ^4.17.5
   firebase_auth: ^4.20.0
   image_picker: ^1.1.1
-  firebase_storage: 11.7.7
+  firebase_storage: ^11.7.7
   random_string: ^2.1.0
   uuid: ^3.0.6
   flutter_image_compress: ^1.1.0
@@ -40,12 +38,17 @@ dependencies:
   flutter_riverpod: ^2.5.1
   google_sign_in: ^6.2.1
   http: ^1.2.1
+  connectivity_plus: ^2.0.2
+  fluttertoast: ^8.0.8
+  photo_view: ^0.15.0
+  image_cropper: ^7.1.0
+  firebase_core: ^2.32.0
+  cloud_firestore: ^4.17.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   device_preview: ^1.2.0
-
 
 flutter_icons:
   android: true
@@ -62,7 +65,6 @@ flutter:
     - assets/background/
     - assets/default_avatar.png
     - assets/default_diwanyah.png
-
 
   fonts:
     - family: Tajawal

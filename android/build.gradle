@@ -1,13 +1,22 @@
 buildscript {
-    ext.kotlin_version = '1.8.22'
+    ext.kotlin_version = '1.9.21'
     repositories {
         google()
         mavenCentral()
     }
+    // إضافة استراتيجية إعادة التوجيه داخل buildscript
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'kmalnshrah.android.tools.build') {
+                // تحويل الطلب إلى المجموعة الرسمية وباستخدام الإصدار المحدد
+                details.useTarget group: 'com.android.tools.build', name: details.requested.name, version: '7.4.2'
+            }
+        }
+    }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath 'com.google.gms:google-services:4.4.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.4.1' // إذا كنت تستخدم Firebase
     }
 }
 
@@ -15,6 +24,14 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+    // إضافة استراتيجية إعادة التوجيه داخل جميع المشاريع
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'kmalnshrah.android.tools.build') {
+                details.useTarget group: 'com.android.tools.build', name: details.requested.name, version: '7.4.2'
+            }
+        }
     }
 }
 

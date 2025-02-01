@@ -1,65 +1,40 @@
-buildscript {
-    ext.kotlin_version = '1.8.22'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.4.1' // إذا كنت تستخدم Firebase
-    }
-}
-
 plugins {
     id "com.android.application"
     id "kotlin-android"
+    id "com.google.gms.google-services"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
-}
-
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode', '214')
-def flutterVersionName = localProperties.getProperty('flutter.versionName', '2.1.4')
-
 android {
     namespace "kmalnshrah.murada.sa"
-    compileSdk 34
-    buildToolsVersion "34.0.0" // تم تحديث buildToolsVersion إلى 34.0.0
+    compileSdkVersion flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = '17'
-    }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        jvmTarget = '1.8'
     }
 
     defaultConfig {
         applicationId "kmalnshrah.murada.sa"
-        minSdkVersion 21
-        targetSdkVersion 34 // تم تحديث targetSdkVersion إلى 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+
+        // تفعيل MultiDex
+        multiDexEnabled true
     }
 
     signingConfigs {
         release {
             keyAlias 'murad'
             keyPassword 'Ali15455&&@@'
-            storeFile file('C:\\dev\\keys\\key\\murad.jks')
+            storeFile file('C:\\dev\\key\\murad.jks')
             storePassword 'Ali15455&&@@'
         }
     }
@@ -67,6 +42,13 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
@@ -76,8 +58,10 @@ flutter {
 }
 
 dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.1.0')
+    implementation 'com.google.firebase:firebase-firestore'
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    // يمكنك إضافة التبعيات الأخرى هنا
-}
 
-apply plugin: 'com.google.gms.google-services'
+    // إضافة مكتبة MultiDex
+    implementation 'androidx.multidex:multidex:2.0.1'
+}

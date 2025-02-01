@@ -9,6 +9,7 @@ import '../settings_provider.dart';
 import 'player_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:vibration/vibration.dart';
 
 class DiwaniyaDetails extends StatefulWidget {
   final String diwaniyaId;
@@ -22,18 +23,12 @@ class DiwaniyaDetails extends StatefulWidget {
 
 class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool showAddPlayerButton = true;
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('ar', null);
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        showAddPlayerButton = _tabController.index == 0;
-      });
-    });
   }
 
   void _showAddPlayerDialog() {
@@ -45,6 +40,12 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
       final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
       setState(() {
         playerImage = pickedFile != null ? File(pickedFile.path) : null;
+      });
+    }
+
+    void _removeImage() {
+      setState(() {
+        playerImage = null;
       });
     }
 
@@ -64,7 +65,15 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
               ),
               SizedBox(height: 20),
               playerImage != null
-                  ? Image.file(playerImage!, height: 100)
+                  ? Column(
+                children: [
+                  Image.file(playerImage!, height: 100),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: _removeImage,
+                  ),
+                ],
+              )
                   : Text('لم يتم تحديد أي صورة'),
               ElevatedButton(
                 onPressed: _pickImage,
@@ -83,6 +92,15 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
               child: Text('إضافة'),
               onPressed: () async {
                 if (playerName.isNotEmpty) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) {
+                      return Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    },
+                  );
                   String? imageUrl;
                   if (playerImage != null) {
                     imageUrl = await _uploadImage(playerImage!);
@@ -94,7 +112,8 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                   );
                   await Provider.of<PlayerProvider>(context, listen: false).addPlayer(newPlayer);
                   await DatabaseService().addPlayer(widget.diwaniyaId, newPlayer);
-                  Navigator.pop(context);
+                  Navigator.pop(context); // Close the progress indicator
+                  Navigator.pop(context); // Close the add player dialog
                 }
               },
             ),
@@ -124,6 +143,12 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
       });
     }
 
+    void _removeImage() {
+      setState(() {
+        newImageFile = null;
+      });
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -141,9 +166,25 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
               ),
               SizedBox(height: 20),
               newImageFile != null
-                  ? Image.file(newImageFile!, height: 100)
+                  ? Column(
+                children: [
+                  Image.file(newImageFile!, height: 100),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: _removeImage,
+                  ),
+                ],
+              )
                   : (player.imageUrl != null && player.imageUrl!.isNotEmpty
-                  ? Image.network(player.imageUrl!, height: 100)
+                  ? Column(
+                children: [
+                  Image.network(player.imageUrl!, height: 100),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: _removeImage,
+                  ),
+                ],
+              )
                   : Text('لم يتم تحديد أي صورة')),
               ElevatedButton(
                 onPressed: _pickImage,
@@ -162,43 +203,25 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
               child: Text('تعديل'),
               onPressed: () async {
                 if (newName != null && newName!.isNotEmpty) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) {
+                      return Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    },
+                  );
                   player.name = newName!;
                   if (newImageFile != null) {
                     player.imageUrl = await _uploadImage(newImageFile!);
                   }
                   await Provider.of<PlayerProvider>(context, listen: false).updatePlayer(player);
                   await DatabaseService().updatePlayer(widget.diwaniyaId, player);
-                  Navigator.pop(context);
+                  await DatabaseService().updatePlayerNameInArchive(widget.diwaniyaId, player.id, newName!);
+                  Navigator.pop(context); // Close the progress indicator
+                  Navigator.pop(context); // Close the edit player dialog
                 }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showOptions(BuildContext context, Player player) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: Icon(Icons.edit),
-              title: Text('تعديل الاسم والصورة'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditPlayerDialog(player);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.delete),
-              title: Text('حذف اللاعب'),
-              onTap: () async {
-                Navigator.pop(context);
-                await Provider.of<PlayerProvider>(context, listen: false).deletePlayer(player.id);
-                await DatabaseService().deletePlayer(widget.diwaniyaId, player.id);
               },
             ),
           ],
@@ -237,6 +260,12 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: Text('تفاصيل الديوانية'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: _showAddPlayerDialog,
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -248,8 +277,8 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
               controller: _tabController,
               tabs: [
                 Tab(text: 'اللاعبين'),
-                Tab(text: 'تصنيف اللاعبين'),
-                Tab(text: 'أرشيف الصكات'),
+                Tab(text: 'الترتيب'),
+                Tab(text: 'الأرشيف'),
               ],
               labelColor: settingsProvider.appColor,
               indicatorColor: settingsProvider.appColor,
@@ -273,6 +302,9 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                         itemCount: players.length,
                         itemBuilder: (context, index) {
                           var player = players[index];
+                          double winPercentage = (player.wins + player.losses) > 0
+                              ? (player.wins / (player.wins + player.losses)) * 100
+                              : 0;
                           return Card(
                             elevation: 5.0,
                             child: ListTile(
@@ -299,9 +331,53 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                                 ),
                               ),
                               title: Text(player.name),
-                              subtitle: Text('فوز: ${player.wins} - خسارة: ${player.losses}'),
+                              subtitle: Row(
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.emoji_events, color: Colors.green),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'فوز: ${player.wins}',
+                                            style: TextStyle(color: Colors.green),
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.sentiment_very_dissatisfied, color: Colors.red),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'خسارة: ${player.losses}',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Spacer(),
+                                  Column(
+                                    children: [
+                                      CircularProgressIndicator(
+                                        value: winPercentage / 100,
+                                        backgroundColor: Colors.red.withOpacity(0.3),
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        '${winPercentage.toStringAsFixed(1)}%',
+                                        style: TextStyle(color: settingsProvider.appColor),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                               onLongPress: () {
-                                _showOptions(context, player);
+                                _showEditPlayerDialog(player);
+                                Vibration.vibrate();
                               },
                             ),
                           );
@@ -309,7 +385,7 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                       );
                     },
                   ),
-                  // تبويب تصنيف اللاعبين
+                  // تبويب الترتيب
                   StreamBuilder<List<Player>>(
                     stream: DatabaseService().getPlayersStream(widget.diwaniyaId),
                     builder: (context, snapshot) {
@@ -377,19 +453,19 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                                     Positioned(
                                       right: 0,
                                       bottom: 0,
-                                      child: Icon(Icons.emoji_events, color: Colors.amber, size: 24),
+                                      child: Icon(Icons.star, color: Colors.amber, size: 24),
                                     ),
                                   if (index == 1)
                                     Positioned(
                                       right: 0,
                                       bottom: 0,
-                                      child: Icon(Icons.emoji_events, color: Colors.grey, size: 24),
+                                      child: Icon(Icons.star, color: Colors.grey, size: 24),
                                     ),
                                   if (index == 2)
                                     Positioned(
                                       right: 0,
                                       bottom: 0,
-                                      child: Icon(Icons.emoji_events, color: Colors.brown, size: 24),
+                                      child: Icon(Icons.star, color: Colors.brown, size: 24),
                                     ),
                                 ],
                               ),
@@ -445,9 +521,9 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                       );
                     },
                   ),
-                  // تبويب أرشيف الصكات
-                  StreamBuilder<List<ScoreArchive>>(
-                    stream: DatabaseService().getScoreArchiveStream(widget.diwaniyaId),
+                  // تبويب الأرشيف
+                  FutureBuilder<List<ScoreArchive>>(
+                    future: DatabaseService().getScoreArchiveOnce(widget.diwaniyaId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Center(child: CircularProgressIndicator());
@@ -486,6 +562,17 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                                 child: ListTile(
                                   title: Column(
                                     children: [
+                                      Center(
+                                        child: Text(
+                                          usIsWinner ? 'قامت لنا' : 'قامت لهم',
+                                          style: TextStyle(
+                                            color: usIsWinner ? Colors.green : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 5),
                                       Center(
                                         child: Text(
                                           formattedDateTime,
@@ -570,21 +657,47 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                                                 ),
                                               ),
                                               SizedBox(height: 5),
-                                              Text(
-                                                'المجموع: ${archive.usScore}',
-                                                style: TextStyle(color: settingsProvider.appColor),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green.withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  'لنا ${archive.usScore}',
+                                                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                                ),
                                               ),
                                             ],
                                           ),
                                           Column(
                                             children: [
+                                              Image.asset(
+                                                'assets/logo.png', // ضع مسار صورة شعار التطبيق هنا
+                                                width: 50,
+                                                height: 50,
+                                              ),
+                                              SizedBox(height: 5),
                                               Text(
-                                                'VS',
+                                                'مدة النشرة',
                                                 style: TextStyle(
                                                   color: settingsProvider.appColor,
-                                                  fontSize: 24,
+                                                  fontSize: 16,
                                                   fontWeight: FontWeight.bold,
                                                 ),
+                                              ),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.timer, color: settingsProvider.appColor),
+                                                  SizedBox(width: 5),
+                                                  Text(
+                                                    archive.duration,
+                                                    style: TextStyle(
+                                                      color: settingsProvider.appColor,
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
@@ -662,26 +775,19 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
                                                 ),
                                               ),
                                               SizedBox(height: 5),
-                                              Text(
-                                                'المجموع: ${archive.themScore}',
-                                                style: TextStyle(color: settingsProvider.appColor),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red.withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  'لهم ${archive.themScore}',
+                                                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                                ),
                                               ),
                                             ],
                                           ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 10),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          if (usIsWinner)
-                                            Icon(Icons.sentiment_very_satisfied, color: Colors.green, size: 30),
-                                          if (!usIsWinner)
-                                            Icon(Icons.sentiment_very_dissatisfied, color: Colors.red, size: 30),
-                                          if (themIsWinner)
-                                            Icon(Icons.sentiment_very_satisfied, color: Colors.green, size: 30),
-                                          if (!themIsWinner)
-                                            Icon(Icons.sentiment_very_dissatisfied, color: Colors.red, size: 30),
                                         ],
                                       ),
                                     ],
@@ -700,13 +806,6 @@ class _DiwaniyaDetailsState extends State<DiwaniyaDetails> with SingleTickerProv
           ],
         ),
       ),
-      floatingActionButton: showAddPlayerButton
-          ? FloatingActionButton(
-        onPressed: _showAddPlayerDialog,
-        backgroundColor: settingsProvider.appColor,
-        child: Icon(Icons.add),
-      )
-          : null,
     );
   }
 }

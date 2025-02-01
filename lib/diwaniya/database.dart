@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'models.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -69,10 +71,8 @@ class DatabaseService {
     // إضافة بيانات اللاعب إلى أرشيف اللاعبين المحذوفين
     if (playerData != null) {
       await _db.collection('diwaniyat').doc(diwaniyaId).collection('deletedPlayersArchive').add(playerData);
+      await _db.collection('diwaniyat').doc(diwaniyaId).collection('players').doc(playerId).update({'isDeleted': true});
     }
-
-    // حذف اللاعب
-    await _db.collection('diwaniyat').doc(diwaniyaId).collection('players').doc(playerId).delete();
   }
 
   Future<void> leaveDiwaniya(String diwaniyaId, String userId) async {
@@ -161,6 +161,26 @@ class DatabaseService {
     return snapshot.data() ?? {};
   }
 
+  Future<void> updatePlayerNameInArchive(String diwaniyaId, String oldName, String newName) async {
+    var archiveRef = _db.collection('diwaniyat').doc(diwaniyaId).collection('scoreArchive');
+    var archiveSnapshot = await archiveRef.where('teamUs1', isEqualTo: oldName).get();
+    for (var doc in archiveSnapshot.docs) {
+      await doc.reference.update({'teamUs1': newName});
+    }
+    archiveSnapshot = await archiveRef.where('teamUs2', isEqualTo: oldName).get();
+    for (var doc in archiveSnapshot.docs) {
+      await doc.reference.update({'teamUs2': newName});
+    }
+    archiveSnapshot = await archiveRef.where('teamThem1', isEqualTo: oldName).get();
+    for (var doc in archiveSnapshot.docs) {
+      await doc.reference.update({'teamThem1': newName});
+    }
+    archiveSnapshot = await archiveRef.where('teamThem2', isEqualTo: oldName).get();
+    for (var doc in archiveSnapshot.docs) {
+      await doc.reference.update({'teamThem2': newName});
+    }
+  }
+
   Stream<List<ScoreArchive>> getScoreArchiveStream(String diwaniyaId) {
     return _db
         .collection('diwaniyat')
@@ -193,25 +213,39 @@ class DatabaseService {
     var diwaniyaData = diwaniyaDoc.data();
 
     if (diwaniyaData != null) {
-      List<String> members = List<String>.from(diwaniyaData['members'] ?? []);
-      for (var memberId in members) {
-        await _sendNotification(memberId, title, message);
+      List<String> memberIds = List<String>.from(diwaniyaData['members'] ?? []);
+      for (var memberId in memberIds) {
+        // احصل على رمز FCM للعضو من قاعدة البيانات
+        var memberDoc = await _db.collection('users').doc(memberId).get();
+        var memberData = memberDoc.data();
+        if (memberData != null && memberData['fcmToken'] != null) {
+          String fcmToken = memberData['fcmToken'];
+          await _sendNotification(fcmToken, title, message);
+        }
       }
     }
   }
 
-  Future<void> _sendNotification(String memberId, String title, String message) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
-      'your channel id', // معرف القناة
-      'your channel name', // اسم القناة
-      channelDescription: 'your channel description', // وصف القناة
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: false,
-    );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
-    await flutterLocalNotificationsPlugin.show(
-        0, title, message, platformChannelSpecifics, payload: 'item x');
+  Future<void> _sendNotification(String fcmToken, String title, String message) async {
+    final String serverKey = 'AIzaSyCNUB0-pR7XD-2K4cjnmRxd2dwKYFI7fGw'; // استبدلها بمفتاح الخادم الخاص بك من FCM
+
+    try {
+      await http.post(
+        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Authorization': 'key=$serverKey',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'to': fcmToken,
+          'notification': <String, dynamic>{
+            'title': title,
+            'body': message,
+          },
+        }),
+      );
+    } catch (e) {
+      print('Error sending FCM notification: $e');
+    }
   }
 }

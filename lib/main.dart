@@ -12,6 +12,9 @@ import 'settings_provider.dart';
 import 'dakka_al_wald_page.dart';
 import 'update_manager.dart';
 import 'baloot_calculator_page.dart';
+import 'quickcalculatorpage.dart';
+import 'quickdakkapage.dart';
+import 'choose_features_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'diwaniya/player_provider.dart';
 import 'notification_service.dart';
@@ -25,18 +28,32 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    print("Firebase initialized successfully");
+  } catch (e) {
+    print("Error initializing Firebase: $e");
+  }
 
   SharedPreferences prefs = await SharedPreferences.getInstance();
   String? localUserId = prefs.getString('localUserId');
+  bool? diwaniyaEnabled = prefs.getBool('diwaniyaEnabled');
+  String? selectedGame = prefs.getString('HomePage');
 
   if (localUserId == null) {
     localUserId = Uuid().v4();  // Generate a random UUID
     await prefs.setString('localUserId', localUserId);
   }
 
-  await NotificationService.initialize(); // Initialize notifications
+  try {
+    await NotificationService.initialize(); // Initialize notifications
+    print("Notification service initialized successfully");
+  } catch (e) {
+    print("Error initializing notifications: $e");
+  }
+
+  print("Starting the app with localUserId: $localUserId");
 
   runApp(
     MultiProvider(
@@ -44,15 +61,21 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => PlayerProvider()),
       ],
-      child: KmalnshrahApp(localUserId: localUserId!),
+      child: KmalnshrahApp(
+        localUserId: localUserId!,
+        diwaniyaEnabled: diwaniyaEnabled,
+        selectedGame: selectedGame,
+      ),
     ),
   );
 }
 
 class KmalnshrahApp extends StatelessWidget {
   final String localUserId;
+  final bool? diwaniyaEnabled;
+  final String? selectedGame;
 
-  KmalnshrahApp({required this.localUserId});
+  KmalnshrahApp({required this.localUserId, this.diwaniyaEnabled, this.selectedGame});
 
   @override
   Widget build(BuildContext context) {
@@ -93,14 +116,30 @@ class KmalnshrahApp extends StatelessWidget {
               hintColor: settingsProvider.appColor,
               visualDensity: VisualDensity.adaptivePlatformDensity,
             ),
-            home: HomePage(localUserId: localUserId),
+            home: _getInitialPage(diwaniyaEnabled, selectedGame),
             routes: {
+              '/HomePage': (context) => HomePage(localUserId: localUserId),
               '/Diwaniya': (context) => AddDiwaniya(localUserId: localUserId),
-              '/diwaniya_home': (context) => DiwaniyaHome(localUserId: localUserId), // تعديل هنا
+              '/diwaniya_home': (context) => DiwaniyaHome(localUserId: localUserId),
+              '/BalootCalculator': (context) => BalootCalculatorPage(localUserId: localUserId, diwaniyaId: ''),
+              '/DakkaAlWald': (context) => DakkaAlWaldPage(localUserId: localUserId, diwaniyaId: ''),
+              '/QuickCalculator': (context) => QuickCalculatorPage(),
+              '/QuickDakka': (context) => QuickDakkaPage(),
             },
           ),
         );
       },
     );
+  }
+
+  Widget _getInitialPage(bool? diwaniyaEnabled, String? selectedGame) {
+    print('Getting initial page. diwaniyaEnabled: $diwaniyaEnabled');
+    if (diwaniyaEnabled == null) {
+      return ChooseFeaturesPage(localUserId: localUserId);
+    } else if (selectedGame == null) {
+      return HomePage(localUserId: localUserId);
+    } else {
+      return HomePage(localUserId: localUserId);
+    }
   }
 }

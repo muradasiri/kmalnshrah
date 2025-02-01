@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import 'diwaniya/database.dart';
 import 'diwaniya/models.dart';
 import 'settings_provider.dart';
@@ -66,35 +66,6 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
     _startStopwatch();
     _loadPlayers();
     _applySettings();
-    _loadPlayersData();
-    print('Diwaniya ID: ${widget.diwaniyaId}'); // تتبع قيمة المعرف
-  }
-
-  Future<void> saveGameResult(String diwaniyaId, Map<String, dynamic> gameResult) async {
-    CollectionReference archive = FirebaseFirestore.instance.collection('diwaniyas').doc(diwaniyaId).collection('archive');
-    await archive.add(gameResult);
-  }
-
-  Future<void> _loadPlayersData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      List<String>? teamUsData = prefs.getStringList('teamUs_${widget.diwaniyaId}');
-      List<String>? teamThemData = prefs.getStringList('teamThem_${widget.diwaniyaId}');
-
-      if (teamUsData != null && teamUsData.isNotEmpty) {
-        selectedPlayerUs1 = Player.fromMap(jsonDecode(teamUsData[0]), teamUsData[0]);
-        if (teamUsData.length > 1) {
-          selectedPlayerUs2 = Player.fromMap(jsonDecode(teamUsData[1]), teamUsData[1]);
-        }
-      }
-
-      if (teamThemData != null && teamThemData.isNotEmpty) {
-        selectedPlayerThem1 = Player.fromMap(jsonDecode(teamThemData[0]), teamThemData[0]);
-        if (teamThemData.length > 1) {
-          selectedPlayerThem2 = Player.fromMap(jsonDecode(teamThemData[1]), teamThemData[1]);
-        }
-      }
-    });
   }
 
   Future<void> _loadPlayers() async {
@@ -119,6 +90,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
       bool keepScreenOn = prefs.getBool('keepScreenOn') ?? false;
       WakelockPlus.toggle(enable: keepScreenOn);
     });
+    print('Loaded saved data: $selectedPlayerUs1, $selectedPlayerUs2, $selectedPlayerThem1, $selectedPlayerThem2');
   }
 
   Future<void> _applySettings() async {
@@ -152,6 +124,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
     await _savePlayerToPrefs(prefs, 'selectedPlayerUs2_${widget.diwaniyaId}', selectedPlayerUs2);
     await _savePlayerToPrefs(prefs, 'selectedPlayerThem1_${widget.diwaniyaId}', selectedPlayerThem1);
     await _savePlayerToPrefs(prefs, 'selectedPlayerThem2_${widget.diwaniyaId}', selectedPlayerThem2);
+    print('Saved data: $selectedPlayerUs1, $selectedPlayerUs2, $selectedPlayerThem1, $selectedPlayerThem2');
   }
 
   Future<void> _savePlayerToPrefs(SharedPreferences prefs, String key, Player? player) async {
@@ -169,36 +142,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
     await _savePlayerToPrefs(prefs, 'selectedPlayerUs2_${widget.diwaniyaId}', selectedPlayerUs2);
     await _savePlayerToPrefs(prefs, 'selectedPlayerThem1_${widget.diwaniyaId}', selectedPlayerThem1);
     await _savePlayerToPrefs(prefs, 'selectedPlayerThem2_${widget.diwaniyaId}', selectedPlayerThem2);
-  }
-
-  Future<File> _downloadAndSaveImage(String url, String filename) async {
-    var response = await http.get(Uri.parse(url));
-    var documentDirectory = await getApplicationDocumentsDirectory();
-    var file = File('${documentDirectory.path}/$filename');
-    file.writeAsBytesSync(response.bodyBytes);
-    return file;
-  }
-
-  Future<String?> _getImagePath(String? imageUrl) async {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return null;
-    }
-
-    var documentDirectory = await getApplicationDocumentsDirectory();
-    var filename = imageUrl.split('/').last;
-    var file = File('${documentDirectory.path}/$filename');
-
-    if (await file.exists()) {
-      return file.path;
-    }
-
-    try {
-      var downloadedFile = await _downloadAndSaveImage(imageUrl, filename);
-      return downloadedFile.path;
-    } catch (e) {
-      print('Error downloading image: $e');
-      return null;
-    }
+    print('Saved player data: $selectedPlayerUs1, $selectedPlayerUs2, $selectedPlayerThem1, $selectedPlayerThem2');
   }
 
   void _startStopwatch() {
@@ -294,6 +238,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
   }
 
   void _showResultDialog(String winner) {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -375,11 +320,6 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
         await DatabaseService().updatePlayerRecord(widget.diwaniyaId, selectedPlayerThem2?.id ?? '', true);
       }
 
-      NotificationService.showNotification(
-        'نتيجة الصكة',
-        'الفريق ${winner == 'لنا' ? 'الأول' : 'الثاني'} فاز بنتيجة $usScore - $themScore',
-      );
-
       await DatabaseService().sendNotificationToDiwaniyaMembers(
         widget.diwaniyaId,
         'نتيجة الصكة',
@@ -387,7 +327,6 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
       );
 
       Navigator.of(context).pop(); // Close saving dialog
-
     } catch (e) {
       print('Error saving to archive: $e');
       throw e;
@@ -455,6 +394,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
   }
 
   void _showConfirmationDialog(String title, String content, VoidCallback onConfirm) {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -464,12 +404,14 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
+                if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
                 Navigator.of(context).pop();
               },
               child: Text('إلغاء'),
             ),
             TextButton(
               onPressed: () {
+                if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
                 Navigator.of(context).pop();
                 onConfirm();
               },
@@ -502,31 +444,149 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
     setState(() {
       selectedPlayerUs1 = player;
     });
-    _saveData();
+    _savePlayerData();
   }
 
   void _selectPlayerUs2(Player player) {
     setState(() {
       selectedPlayerUs2 = player;
     });
-    _saveData();
+    _savePlayerData();
   }
 
   void _selectPlayerThem1(Player player) {
     setState(() {
       selectedPlayerThem1 = player;
     });
-    _saveData();
+    _savePlayerData();
   }
 
   void _selectPlayerThem2(Player player) {
     setState(() {
       selectedPlayerThem2 = player;
     });
-    _saveData();
+    _savePlayerData();
+  }
+
+  void _showPlayerSelectionDialog() {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Container(
+              padding: EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('اختيار اللاعبين', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: players.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        bool isSelectedUs1 = players[index] == selectedPlayerUs1;
+                        bool isSelectedUs2 = players[index] == selectedPlayerUs2;
+                        bool isSelectedThem1 = players[index] == selectedPlayerThem1;
+                        bool isSelectedThem2 = players[index] == selectedPlayerThem2;
+
+                        return ListTile(
+                          leading: _buildPlayerImage(players[index], settingsProvider),
+                          title: Text(players[index].name),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelectedUs1 || isSelectedUs2 || isSelectedThem1 || isSelectedThem2)
+                                Text(
+                                  isSelectedUs1 || isSelectedUs2 ? 'فريق لنا' : 'فريق لهم',
+                                  style: TextStyle(color: isSelectedUs1 || isSelectedUs2 ? Colors.blue : Colors.red),
+                                ),
+                              Checkbox(
+                                value: isSelectedUs1 || isSelectedUs2 || isSelectedThem1 || isSelectedThem2,
+                                onChanged: (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      if (!isSelectedUs1 && !isSelectedUs2 && !isSelectedThem1 && !isSelectedThem2) {
+                                        if (selectedPlayerUs1 == null) {
+                                          selectedPlayerUs1 = players[index];
+                                        } else if (selectedPlayerUs2 == null) {
+                                          selectedPlayerUs2 = players[index];
+                                        } else if (selectedPlayerThem1 == null) {
+                                          selectedPlayerThem1 = players[index];
+                                        } else if (selectedPlayerThem2 == null) {
+                                          selectedPlayerThem2 = players[index];
+                                        }
+                                      }
+                                    } else {
+                                      if (isSelectedUs1) {
+                                        selectedPlayerUs1 = null;
+                                      } else if (isSelectedUs2) {
+                                        selectedPlayerUs2 = null;
+                                      } else if (isSelectedThem1) {
+                                        selectedPlayerThem1 = null;
+                                      } else if (isSelectedThem2) {
+                                        selectedPlayerThem2 = null;
+                                      }
+                                    }
+                                  });
+
+                                  if (settingsProvider.isVibrationEnabled) {
+                                    Vibration.vibrate(duration: 50);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            setState(() {
+                              if (selectedPlayerUs1 == null) {
+                                selectedPlayerUs1 = players[index];
+                              } else if (selectedPlayerUs2 == null) {
+                                selectedPlayerUs2 = players[index];
+                              } else if (selectedPlayerThem1 == null) {
+                                selectedPlayerThem1 = players[index];
+                              } else if (selectedPlayerThem2 == null) {
+                                selectedPlayerThem2 = players[index];
+                              } else {
+                                if (selectedPlayerUs1 == players[index]) {
+                                  selectedPlayerUs1 = null;
+                                } else if (selectedPlayerUs2 == players[index]) {
+                                  selectedPlayerUs2 = null;
+                                } else if (selectedPlayerThem1 == players[index]) {
+                                  selectedPlayerThem1 = null;
+                                } else if (selectedPlayerThem2 == players[index]) {
+                                  selectedPlayerThem2 = null;
+                                }
+                              }
+
+                              if (settingsProvider.isVibrationEnabled) {
+                                Vibration.vibrate(duration: 50);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
+                      _savePlayerData(); // Save selected players
+                      Navigator.of(context).pop();
+                    },
+                    child: Text('تأكيد'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showResetConfirmationDialog() {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -536,12 +596,14 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
           actions: <Widget>[
             TextButton(
               onPressed: () {
+                if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
                 Navigator.of(context).pop();
               },
               child: Text('إلغاء'),
             ),
             TextButton(
               onPressed: () {
+                if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
                 Navigator.of(context).pop();
                 _resetScores();
               },
@@ -571,11 +633,17 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
         actions: [
           IconButton(
             icon: Icon(Icons.undo),
-            onPressed: _undoLastRound,
+            onPressed: () {
+              if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
+              _undoLastRound();
+            },
           ),
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _showResetConfirmationDialog, // إضافة مربع حوار التأكيد
+            onPressed: () {
+              if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
+              _showResetConfirmationDialog();
+            },
           ),
         ],
       ),
@@ -589,7 +657,10 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
                 _buildPlayerSelection(selectedPlayerUs1, _selectPlayerUs1),
                 _buildPlayerSelection(selectedPlayerUs2, _selectPlayerUs2),
                 GestureDetector(
-                  onTap: _rotateArrow,
+                  onTap: () {
+                    if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
+                    _rotateArrow();
+                  },
                   child: Transform.rotate(
                     angle: arrowAngle,
                     child: Icon(Icons.arrow_upward, size: 50, color: settingsProvider.appColor),
@@ -657,7 +728,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
                   children: [
                     Divider(color: color),
                     Text(
-                      'جولة رقم ${index + 1}',
+                      ' جولة ${index + 1}',
                       style: TextStyle(fontSize: 18.0, color: color, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
@@ -700,12 +771,13 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
   }
 
   Widget _buildControlButtons() {
+    final settingsProvider = Provider.of<SettingsProvider>(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
         ElevatedButton(
-          onPressed: _selectedPlayersCount() == 4 ? _recordRoundScores : null,
-          child: Text(showInputFields ? 'تسجيل' : 'تسجيل النقاط', style: TextStyle(fontSize: 18.0)),
+          onPressed: _selectedPlayersCount() == 4 ? _recordRoundScores : _showPlayerSelectionDialog,
+          child: Text(showInputFields ? 'تسجيل' : (_selectedPlayersCount() == 4 ? 'تسجيل النقاط' : 'اختيار لاعبين'), style: TextStyle(fontSize: 18.0)),
           style: ElevatedButton.styleFrom(
             backgroundColor: _selectedPlayersCount() == 4 ? Provider.of<SettingsProvider>(context).appColor : Colors.grey,
             foregroundColor: Colors.white,
@@ -715,6 +787,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
         if (showInputFields)
           ElevatedButton(
             onPressed: () {
+              if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
               setState(() {
                 showInputFields = false;
               });
@@ -731,12 +804,11 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
   }
 
   Widget _buildPlayerSelection(Player? selectedPlayer, Function(Player) onSelect) {
+    final settingsProvider = Provider.of<SettingsProvider>(context);
     return GestureDetector(
-      onTap: () async {
-        Player? player = await _selectPlayerDialog();
-        if (player != null && !_isPlayerSelected(player)) {
-          onSelect(player);
-        }
+      onTap: () {
+        if (settingsProvider.isVibrationEnabled) Vibration.vibrate(duration: 50);
+        _showPlayerSelectionDialog();
       },
       child: Container(
         height: 50.0,
@@ -746,11 +818,12 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
           shape: BoxShape.circle,
           color: selectedPlayer == null ? Colors.grey : Colors.transparent,
           border: Border.all(
-            color: selectedPlayer != null ? Provider.of<SettingsProvider>(context).appColor : Colors.transparent,
+            color: selectedPlayer != null ? settingsProvider.appColor : Colors.transparent,
             width: 2.0,
           ),
         ),
-        child: selectedPlayer != null && selectedPlayer.imageUrl != null
+        child: selectedPlayer != null
+            ? selectedPlayer.imageUrl != null
             ? ClipOval(
           child: Image.network(
             selectedPlayer.imageUrl!,
@@ -759,8 +832,42 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
         )
             : Center(
           child: Text(
-            selectedPlayer?.name ?? '',
-            style: TextStyle(color: Colors.white, fontSize: 12.0),
+            selectedPlayer.name,
+            style: TextStyle(
+              color: settingsProvider.appColor,
+              fontSize: 12.0,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        )
+            : Image.asset(
+          'assets/default_avatar.png',
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayerImage(Player player, SettingsProvider settingsProvider) {
+    return player.imageUrl != null
+        ? ClipOval(
+      child: Image.network(
+        player.imageUrl!,
+        fit: BoxFit.cover,
+        width: 50,
+        height: 50,
+      ),
+    )
+        : ClipOval(
+      child: Container(
+        width: 50,
+        height: 50,
+        color: settingsProvider.appColor,
+        child: Center(
+          child: Text(
+            player.name,
+            style: TextStyle(color: Colors.white, fontSize: 12),
             textAlign: TextAlign.center,
           ),
         ),
@@ -781,28 +888,7 @@ class _BalootCalculatorPageState extends State<BalootCalculatorPage> {
               itemCount: players.length,
               itemBuilder: (BuildContext context, int index) {
                 return ListTile(
-                  leading: ClipOval(
-                    child: Image.network(
-                      players[index].imageUrl ?? '',
-                      fit: BoxFit.cover,
-                      width: 50,
-                      height: 50,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 50,
-                          height: 50,
-                          color: Provider.of<SettingsProvider>(context).appColor,
-                          child: Center(
-                            child: Text(
-                              players[index].name,
-                              style: TextStyle(color: Colors.white, fontSize: 12),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  leading: _buildPlayerImage(players[index], Provider.of<SettingsProvider>(context)),
                   title: Text(players[index].name),
                   onTap: () {
                     Navigator.of(context).pop(players[index]);

@@ -1,9 +1,10 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -63,5 +64,29 @@ class NotificationService {
     const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
     await _flutterLocalNotificationsPlugin.show(
         0, title, message, platformChannelSpecifics, payload: 'item x');
+  }
+
+  // Function to send FCM notification
+  static Future<void> sendFCMNotification(String fcmToken, String title, String body) async {
+    final String serverKey = 'AIzaSyCNUB0-pR7XD-2K4cjnmRxd2dwKYFI7fGw'; // استبدلها بمفتاح الخادم الخاص بك من FCM
+
+    try {
+      await http.post(
+        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Authorization': 'key=$serverKey',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'to': fcmToken,
+          'notification': <String, dynamic>{
+            'title': title,
+            'body': body,
+          },
+        }),
+      );
+    } catch (e) {
+      print('Error sending FCM notification: $e');
+    }
   }
 }

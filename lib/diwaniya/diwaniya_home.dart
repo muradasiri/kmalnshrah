@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vibration/vibration.dart';
 import 'database.dart';
 import 'diwaniya_details.dart';
 import 'models.dart';
@@ -61,7 +62,6 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
     String? diwaniyatData = prefs.getString('diwaniyat');
     String? playersData = prefs.getString('players');
 
-    // Fetch updated diwaniyat and players from Firestore
     List<Diwaniya> updatedDiwaniyat = await DatabaseService().getDiwaniyatForUserOnce(widget.localUserId);
     Map<String, List<Player>> updatedPlayers = {};
 
@@ -69,7 +69,6 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
       updatedPlayers[diwaniya.id] = await DatabaseService().getPlayersOnce(diwaniya.id);
     }
 
-    // Compare with local data to see if there's any change
     List<Diwaniya> localDiwaniyat = diwaniyatData != null
         ? (jsonDecode(diwaniyatData) as List).map((data) => Diwaniya.fromMap(data, data['id'])).toList()
         : [];
@@ -84,7 +83,6 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
     bool playersChanged = !mapEquals(localPlayers, updatedPlayers);
 
     if (diwaniyatChanged || playersChanged) {
-      // Save updated data locally
       prefs.setString('diwaniyat', jsonEncode(updatedDiwaniyat.map((diwaniya) => diwaniya.toMap()).toList()));
       prefs.setString('players', jsonEncode(updatedPlayers.map((diwaniyaId, players) => MapEntry(
           diwaniyaId,
@@ -212,6 +210,15 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
                   child: Text('إضافة'),
                   onPressed: () async {
                     if (diwaniyaName.isNotEmpty) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) {
+                          return Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
+                      );
                       String code = _generateDiwaniyaCode();
                       String? imageUrl;
                       if (diwaniyaImage != null) {
@@ -227,7 +234,8 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
                       );
                       await DatabaseService().addDiwaniya(newDiwaniya);
                       _syncDiwaniyatAndPlayersIfNeeded();
-                      Navigator.pop(context);
+                      Navigator.pop(context); // Close the progress indicator
+                      Navigator.pop(context); // Close the add diwaniya dialog
                     }
                   },
                 ),
@@ -340,7 +348,7 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
                       ),
                     ],
                   )
-                      : Text('No image selected')),
+                      : Text('لم يتم تحديد أي صورة')),
                   ElevatedButton(
                     onPressed: () {
                       _pickImage((image) {
@@ -364,13 +372,23 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
                   child: Text('تعديل'),
                   onPressed: () async {
                     if (newName != null && newName!.isNotEmpty) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) {
+                          return Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
+                      );
                       diwaniya.name = newName!;
                       if (newImageFile != null) {
                         diwaniya.imageUrl = await _uploadImage(newImageFile!);
                       }
                       await DatabaseService().updateDiwaniya(diwaniya);
                       _syncDiwaniyatAndPlayersIfNeeded();
-                      Navigator.pop(context);
+                      Navigator.pop(context); // Close the progress indicator
+                      Navigator.pop(context); // Close the edit diwaniya dialog
                     }
                   },
                 ),
@@ -481,52 +499,138 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
                     },
                     child: Card(
                       elevation: 5.0,
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: settingsProvider.appColor,
-                          radius: 30,
-                          child: CircleAvatar(
-                            radius: 28,
-                            backgroundColor: Colors.white,
-                            backgroundImage: diwaniya.imageUrl != null
-                                ? NetworkImage(diwaniya.imageUrl!)
-                                : AssetImage('assets/default_diwanyah.png') as ImageProvider,
-                          ),
-                        ),
-                        title: Text(
-                          diwaniya.name,
-                          style: TextStyle(
-                            color: settingsProvider.appColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Column(
+                      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                      child: Padding(
+                        padding: const EdgeInsets.all(15.0),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      diwaniya.name,
+                                      style: TextStyle(
+                                        color: settingsProvider.appColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    SizedBox(height: 5),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.group, size: 16, color: settingsProvider.appColor),
+                                        SizedBox(width: 5),
+                                        Text('${players.length} أعضاء ', style: TextStyle(color: settingsProvider.appColor)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                CircleAvatar(
+                                  backgroundColor: settingsProvider.appColor,
+                                  radius: 30,
+                                  child: CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: Colors.white,
+                                    backgroundImage: diwaniya.imageUrl != null
+                                        ? NetworkImage(diwaniya.imageUrl!)
+                                        : AssetImage('assets/default_diwanyah.png') as ImageProvider,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Divider(color: settingsProvider.appColor),
                             Row(
                               children: [
                                 Text('كود الديوانية: ${diwaniya.code}'),
                                 IconButton(
-                                  icon: Icon(Icons.copy),
+                                  icon: Icon(Icons.copy, size: 16),
                                   onPressed: () {
                                     Clipboard.setData(ClipboardData(text: diwaniya.code));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text('تم نسخ الكود')),
                                     );
+                                    if (settingsProvider.isVibrationEnabled) {
+                                      Vibration.vibrate(duration: 50);
+                                    }
                                   },
                                 ),
                               ],
                             ),
+                            Text(
+                              'الأفضل',
+                              style: TextStyle(
+                                color: settingsProvider.appColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 10),
                             Row(
-                              children: [
-                                Icon(Icons.group),
-                                SizedBox(width: 5),
-                                Text('${diwaniya.members.length} عضو'),
-                              ],
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: topPlayers.asMap().entries.map((entry) {
+                                int idx = entry.key;
+                                Player player = entry.value;
+                                Color borderColor;
+                                String position;
+                                if (idx == 0) {
+                                  borderColor = Colors.amber;
+                                  position = 'الأول';
+                                } else if (idx == 1) {
+                                  borderColor = Colors.grey;
+                                  position = 'الثاني';
+                                } else if (idx == 2) {
+                                  borderColor = Colors.brown;
+                                  position = 'الثالث';
+                                } else {
+                                  return Container();
+                                }
+                                return Column(
+                                  children: [
+                                    Stack(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: borderColor,
+                                          radius: 28,
+                                          child: CircleAvatar(
+                                            radius: 26,
+                                            backgroundColor: settingsProvider.appColor,
+                                            backgroundImage: player.imageUrl != null
+                                                ? NetworkImage(player.imageUrl!)
+                                                : null,
+                                            child: player.imageUrl == null
+                                                ? Text(
+                                              player.name[0],
+                                              style: TextStyle(color: Colors.white),
+                                            )
+                                                : null,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 0,
+                                          right: 0,
+                                          child: Icon(
+                                            Icons.star,
+                                            color: borderColor,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 5),
+                                    Text(
+                                      position,
+                                      style: TextStyle(color: borderColor, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
                             ),
                           ],
                         ),
-
                       ),
                     ),
                   );
@@ -535,34 +639,6 @@ class _DiwaniyaHomeState extends State<DiwaniyaHome> {
             },
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildTopPlayerAvatarWithTrophy(Player player, Color borderColor, Color appColor, IconData trophyIcon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: borderColor,
-            child: CircleAvatar(
-              radius: 26,
-              backgroundColor: appColor,
-              backgroundImage: player.imageUrl != null
-                  ? NetworkImage(player.imageUrl!)
-                  : null,
-              child: player.imageUrl == null
-                  ? Text(
-                player.name[0],
-                style: TextStyle(color: Colors.white),
-              )
-                  : null,
-            ),
-          ),
-
-        ],
       ),
     );
   }
